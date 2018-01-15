@@ -10174,6 +10174,10 @@ void readConfiguration(int argc, char **argv)
   bool updateConfig=FALSE;
   bool genLayout=FALSE;
   int retVal;
+
+  bool overwriteOutputDirectory=FALSE;
+  const char *outputDirectory=0;
+
   while (optind<argc && argv[optind][0]=='-' &&
                (isalpha(argv[optind][1]) || argv[optind][1]=='?' ||
                 argv[optind][1]=='-')
@@ -10181,6 +10185,13 @@ void readConfiguration(int argc, char **argv)
   {
     switch(argv[optind][1])
     {
+      case 'o':
+        outputDirectory=getArg(argc,argv,optind);
+        if (outputDirectory)
+        {
+          overwriteOutputDirectory=TRUE;
+        }
+        break;
       case 'g':
         genConfig=TRUE;
         configName=getArg(argc,argv,optind);
@@ -10487,6 +10498,11 @@ void readConfiguration(int argc, char **argv)
     exit(1);
   }
 
+  if (overwriteOutputDirectory)
+  {
+    Config_getString(OUTPUT_DIRECTORY) = outputDirectory;
+  }
+
   if (updateConfig)
   {
     generateConfigFile(configName,shortList,TRUE);
@@ -10505,7 +10521,22 @@ void checkConfiguration()
 {
 
   Config::postProcess(FALSE);
+
+  bool overwriteOutputDirectory=FALSE;
+  QCString outputDirectory;
+  if(Config_getString(OUTPUT_DIRECTORY).data() != NULL)
+  {
+    outputDirectory = Config_getString(OUTPUT_DIRECTORY);
+    overwriteOutputDirectory=TRUE;
+  }
+
   Config::checkAndCorrect();
+
+  if (overwriteOutputDirectory)
+  {
+    Config_getString(OUTPUT_DIRECTORY) = outputDirectory;
+  }
+
   initWarningFormat();
 }
 
