@@ -1097,6 +1097,32 @@ static int isHeaderline(const char *data, int size)
   return 0;
 }
 
+/** returns TRUE if this line starts a list */
+static bool isList(const char *data, int size, int indent, int indentOffset)
+{
+  int i = 0;
+  while (i<size && data[i]==' ')
+  {
+    i++;
+  }
+
+  if (i < indent + codeBlockIndent + indentOffset)
+  {
+    while(i<size && data[i]>= '0' && data[i] <= '9')
+    {
+      i++;
+    }
+    if ((data[i] != '.') && (i+1 < size) && (data[i+1] == ' '))
+    {
+      
+    }
+    else 
+    {
+      return FALSE;
+    }
+  }
+}
+
 /** returns TRUE if this line starts a block quote */
 static bool isBlockQuote(const char *data,int size,int indent)
 {
@@ -1391,19 +1417,36 @@ static int computeIndentExcludingListMarkers(const char *data,int size)
 }
 
 static bool isFencedCodeBlock(const char *data,int size,int refIndent,
-                             QCString &lang,int &start,int &end,int &offset)
+                             QCString &lang,int &start,int &end,int &offset, int &codeBlockIndent)
 {
-  // rules: at least 3 ~~~, end of the block same amount of ~~~'s, otherwise
+  // rules: at least 3 ```, end of the block same amount of ```'s, otherwise
   // return FALSE
   int i=0;
   int indent=0;
   int startTildes=0;
-  while (i<size && data[i]==' ') indent++,i++;
-  if (indent>=refIndent+4) return FALSE; // part of code block
+
+  while (i<size && data[i]==' ')
+  {
+    indent++;
+    i++;
+  }
+  
   char tildaChar='~';
-  if (i<size && data[i]=='`') tildaChar='`';
+
+  if (i<size && data[i]=='`') 
+    tildaChar='`';
+
   while (i<size && data[i]==tildaChar) startTildes++,i++;
+  
   if (startTildes<3) return FALSE; // not enough tildes
+
+  /*if (indent >= refIndent + 4) 
+  {
+    return FALSE; // part of code block
+  }*/
+
+  codeBlockIndent = indent;
+
   if (i<size && data[i]=='{') i++; // skip over optional {
   int startLang=i;
   while (i<size && (data[i]!='\n' && data[i]!='}' && data[i]!=' ')) i++;
@@ -2149,10 +2192,14 @@ static void findEndOfLine(GrowBuf &out,const char *data,int size,
 }
 
 static void writeFencedCodeBlock(GrowBuf &out,const char *data,const char *lng,
-                int blockStart,int blockEnd)
+                int blockStart,int blockEnd, int blockIndent)
 {
   QCString lang = lng;
   if (!lang.isEmpty() && lang.at(0)=='.') lang=lang.mid(1);
+  for(int i =0;i<blockIndent;++i)
+  {
+    out.addStr(" ");
+  }
   out.addStr("@code");
   if (!lang.isEmpty())
   {
@@ -2160,6 +2207,10 @@ static void writeFencedCodeBlock(GrowBuf &out,const char *data,const char *lng,
   }
   out.addStr(data+blockStart,blockEnd-blockStart);
   out.addStr("\n");
+  for(int i =0;i<blockIndent;++i)
+  {
+    out.addStr(" ");
+  }
   out.addStr("@endcode");
 }
 
@@ -2169,7 +2220,7 @@ static QCString processQuotations(const QCString &s,int refIndent)
   const char *data = s.data();
   int size = s.length();
   int i=0,end=0,pi=-1;
-  int blockStart,blockEnd,blockOffset;
+  int blockStart,blockEnd,blockOffset,blockIndent;
   QCString lang;
   while (i<size)
   {
@@ -2178,9 +2229,9 @@ static QCString processQuotations(const QCString &s,int refIndent)
 
     if (pi!=-1)
     {
-      if (isFencedCodeBlock(data+pi,size-pi,refIndent,lang,blockStart,blockEnd,blockOffset))
+      if (isFencedCodeBlock(data+pi,size-pi,refIndent,lang,blockStart,blockEnd,blockOffset,blockIndent))
       {
-        writeFencedCodeBlock(out,data+pi,lang,blockStart,blockEnd);
+        writeFencedCodeBlock(out,data+pi,lang,blockStart,blockEnd, blockIndent);
         i=pi+blockOffset;
         pi=-1;
         end=i+1;
@@ -2262,7 +2313,7 @@ static QCString processBlocks(const QCString &s,int indent)
 
     if (pi!=-1)
     {
-      int blockStart,blockEnd,blockOffset;
+      int blockStart,blockEnd,blockOffset,blockIndent;
       QCString lang;
       blockIndent = indent;
       //printf("isHeaderLine(%s)=%d\n",QCString(data+i).left(size-i).data(),level);
@@ -2333,11 +2384,11 @@ static QCString processBlocks(const QCString &s,int indent)
         pi=-1;
         end=i+1;
       }
-      else if (isFencedCodeBlock(data+pi,size-pi,indent,lang,blockStart,blockEnd,blockOffset))
+      else if (isFencedCodeBlock(data+pi,size-pi,indent,lang,blockStart,blockEnd,blockOffset,blockIndent))
       {
         //printf("Found FencedCodeBlock lang='%s' start=%d end=%d code={%s}\n",
         //       lang.data(),blockStart,blockEnd,QCString(data+pi+blockStart).left(blockEnd-blockStart).data());
-        writeFencedCodeBlock(out,data+pi,lang,blockStart,blockEnd);
+        writeFencedCodeBlock(out,data+pi,lang,blockStart,blockEnd,blockIndent);
         i=pi+blockOffset;
         pi=-1;
         end=i+1;
@@ -2538,13 +2589,13 @@ QCString processMarkdown(const QCString &fileName,const int lineNr,Entry *e,cons
   int refIndent;
   // for replace tabs by spaces
   QCString s = detab(input,refIndent);
-  //printf("======== DeTab =========\n---- output -----\n%s\n---------\n",s.data());
+  printf("======== DeTab =========\n---- output -----\n%s\n---------\n",s.data());
   // then process quotation blocks (as these may contain other blocks)
   s = processQuotations(s,refIndent);
-  //printf("======== Quotations =========\n---- output -----\n%s\n---------\n",s.data());
+  printf("======== Quotations =========\n---- output -----\n%s\n---------\n",s.data());
   // then process block items (headers, rules, and code blocks, references)
   s = processBlocks(s,refIndent);
-  //printf("======== Blocks =========\n---- output -----\n%s\n---------\n",s.data());
+  printf("======== Blocks =========\n---- output -----\n%s\n---------\n",s.data());
   // finally process the inline markup (links, emphasis and code spans)
   processInline(out,s,s.length());
   out.addChar(0);
