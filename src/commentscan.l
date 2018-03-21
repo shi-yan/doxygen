@@ -1288,7 +1288,9 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
                                             int i;
                                             for (i=0;i<yyleng;)
                                             {
-                                              if (yytext[i]=='\n') addOutput('\n'),i++;
+                                              if (yytext[i] == ' ') addOutput(' '),i++;
+                                              else if (yytext[i] == '\t') addOutput("    "),i++;
+                                              else if (yytext[i]=='\n') addOutput('\n'),i++;
                                               else if (strcmp(yytext+i,"\\_linebr")==0) addOutput('\n'),i+=8;
                                               else i++;
                                             }

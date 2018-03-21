@@ -51,6 +51,7 @@
 #include "config.h"
 #include "section.h"
 #include "message.h"
+#include <vector>
 
 //-----------
 
@@ -1165,7 +1166,7 @@ static bool isValidUnorderedList(const char *data, int size, int &indent)
 }
 
 /** returns TRUE if this line starts a list */
-static bool isList(const char *data, int size, int indent, int indentOffset, int &listIndent)
+static bool isNewList(const char *data, int size, int indent, int indentOffset, int &listIndent)
 {
     int i = 0;
     while (i < size && data[i] == ' ')
@@ -1173,16 +1174,16 @@ static bool isList(const char *data, int size, int indent, int indentOffset, int
         i++;
     }
 
-    if (i < indent + codeBlockIndent + indentOffset)
+    if ((i < indent + codeBlockIndent + indentOffset) && (i >= indent + indentOffset))
     {
-        if (isValidOrderedList(data[i], size, listIndent))
+        if (isValidOrderedList(data + i, size, listIndent))
         {
-            listIndent += indent + indentOffset;
+            listIndent += (i - indent - indentOffset);
             return TRUE;
         }
-        else if (isValidUnorderedList(data[i], size, listIndent))
+        else if (isValidUnorderedList(data + i, size, listIndent))
         {
-            listIndent += indent + indentOffset;
+            listIndent += (i - indent - indentOffset);
             return TRUE;
         }
     }
@@ -1191,12 +1192,13 @@ static bool isList(const char *data, int size, int indent, int indentOffset, int
 }
 
 /** returns TRUE if this line starts a block quote */
-static bool isBlockQuote(const char *data, int size, int indent)
+static bool isBlockQuote(const char *data, int size, int indent, int indentOffset, int &listIndent)
 {
     int i = 0;
     while (i < size && data[i] == ' ') i++;
-    if (i < indent + codeBlockIndent) // could be a quotation
+    if (i < indent + codeBlockIndent + indentOffset) // could be a quotation
     {
+        listIndent = i;
         // count >'s and skip spaces
         int level = 0;
         while (i < size && (data[i] == '>' || data[i] == ' '))
@@ -1486,7 +1488,7 @@ static int computeIndentExcludingListMarkers(const char *data, int size)
     return indent;
 }
 
-static bool isFencedCodeBlock(const char *data, int size, int refIndent,
+static bool isFencedCodeBlock(const char *data, int size, int refIndent, int cachedIndentOffset,
                               QCString &lang, int &start, int &end, int &offset, int &codeBlockIndent)
 {
     // rules: at least 3 ```, end of the block same amount of ```'s, otherwise
@@ -1510,10 +1512,10 @@ static bool isFencedCodeBlock(const char *data, int size, int refIndent,
 
     if (startTildes < 3) return FALSE; // not enough tildes
 
-    /*if (indent >= refIndent + 4)
+    if (indent >= refIndent + 4 + cachedIndentOffset)
     {
       return FALSE; // part of code block
-    }*/
+    }
 
     codeBlockIndent = indent;
 
@@ -1983,8 +1985,8 @@ static int hasLineBreak(const char *data, int size)
     int i = 0;
     while (i < size && data[i] != '\n') i++;
     if (i >= size) return 0; // empty line
-    if (i < 2) return 0; // not long enough
-    return (data[i - 1] == ' ' && data[i - 2] == ' ');
+    if (i < 3) return 0; // not long enough
+    return (data[i - 1] == ' ' && data[i - 2] == ' ' && data[i-3] != ' ');
 }
 
 
@@ -2068,7 +2070,7 @@ void writeOneLineHeaderOrRuler(GrowBuf &out, const char *data, int size)
     }
 }
 
-static int writeBlockQuote(GrowBuf &out, const char *data, int size)
+static int writeBlockQuote(GrowBuf &out, const char *data, int size, int blockIndent)
 {
     int l;
     int i = 0;
@@ -2099,6 +2101,10 @@ static int writeBlockQuote(GrowBuf &out, const char *data, int size)
         {
             for (l = curLevel; l < level; l++)
             {
+              for(int e = 0;e<blockIndent;++e)
+              {
+                out.addStr(" ");
+              }
                 out.addStr("<blockquote>\n");
             }
         }
@@ -2106,6 +2112,10 @@ static int writeBlockQuote(GrowBuf &out, const char *data, int size)
         {
             for (l = level; l < curLevel; l++)
             {
+              for(int e = 0;e<blockIndent;++e)
+              {
+                out.addStr(" ");
+              }
                 out.addStr("</blockquote>\n");
             }
         }
@@ -2116,9 +2126,14 @@ static int writeBlockQuote(GrowBuf &out, const char *data, int size)
         // proceed with next line
         i = end;
     }
+
     // end of comment within blockquote => add end markers
     for (l = 0; l < curLevel; l++)
     {
+          for(int e = 0;e<blockIndent;++e)
+          {
+            out.addStr(" ");
+          }
         out.addStr("</blockquote>\n");
     }
     return i;
@@ -2284,6 +2299,23 @@ static void writeFencedCodeBlock(GrowBuf &out, const char *data, const char *lng
     out.addStr("@endcode");
 }
 
+static bool shouldPopListIndent(const char *data, int size, int indent, int indentOffset, int &actualIndent)
+{
+    int i = 0;
+    while (i < size && data[i] == ' ')
+    {
+        i++;
+    }
+
+    if (i < indent + indentOffset)
+    {
+      actualIndent = i;
+      return TRUE;
+    }
+
+    return FALSE;
+}
+
 static QCString processQuotations(const QCString &s, int refIndent)
 {
     GrowBuf out;
@@ -2292,34 +2324,54 @@ static QCString processQuotations(const QCString &s, int refIndent)
     int i = 0, end = 0, pi = -1;
     int blockStart, blockEnd, blockOffset, blockIndent;
     QCString lang;
+    int indentOffset = 0;
+    std::vector<unsigned int> listIndents;
+    unsigned int cachedIndentOffset = 0;
+
     while (i < size)
     {
         findEndOfLine(out, data, size, pi, i, end);
         // line is now found at [i..end)
+        printf("quote out={%s}\n",QCString(data+pi).left(i-pi).data());
 
         if (pi != -1)
         {
-            if (isList())
+            int listIndent = 0;
+            if (isNewList(data+pi, i-pi, refIndent, cachedIndentOffset, listIndent))
             {
-
+              listIndents.push_back(listIndent);
+              cachedIndentOffset += listIndent;
+              //printf("quote out={%s}\n",QCString(data+pi).left(i-pi).data());
+              out.addStr(data + pi, i - pi);
             }
-            else if (isFencedCodeBlock(data + pi, size - pi, refIndent, lang, blockStart, blockEnd, blockOffset, blockIndent))
+            else if (isFencedCodeBlock(data + pi, size - pi, refIndent, cachedIndentOffset, lang, blockStart, blockEnd, blockOffset, blockIndent))
             {
                 writeFencedCodeBlock(out, data + pi, lang, blockStart, blockEnd, blockIndent);
-                i = pi + blockOffset;
+                i = pi + blockOffset + 1;
                 pi = -1;
                 end = i + 1;
                 continue;
             }
-            else if (isBlockQuote(data + pi, i - pi, refIndent))
+            else if (isBlockQuote(data + pi, i - pi, refIndent, cachedIndentOffset, blockIndent))
             {
-                i = pi + writeBlockQuote(out, data + pi, size - pi);
+                i = pi + writeBlockQuote(out, data + pi, size - pi, blockIndent);
                 pi = -1;
                 end = i + 1;
                 continue;
             }
             else
             {
+                int actualIndent = 0;
+                if (shouldPopListIndent(data + pi, i - pi, refIndent, cachedIndentOffset, actualIndent))
+                {
+                  while(listIndents.size() && (cachedIndentOffset + refIndent) > actualIndent )
+                  {
+                    unsigned int lastIndent = listIndents[listIndents.size() - 1];
+                    listIndents.pop_back();
+                    cachedIndentOffset -= lastIndent;
+                  }
+                }
+
                 //printf("quote out={%s}\n",QCString(data+pi).left(i-pi).data());
                 out.addStr(data + pi, i - pi);
             }
@@ -2327,11 +2379,12 @@ static QCString processQuotations(const QCString &s, int refIndent)
         pi = i;
         i = end;
     }
+
     if (pi != -1 && pi < size) // deal with the last line
     {
-        if (isBlockQuote(data + pi, size - pi, refIndent))
+        if (isBlockQuote(data + pi, size - pi, refIndent, cachedIndentOffset, blockIndent))
         {
-            writeBlockQuote(out, data + pi, size - pi);
+            writeBlockQuote(out, data + pi, size - pi, blockIndent);
         }
         else
         {
@@ -2354,6 +2407,7 @@ static QCString processBlocks(const QCString &s, int indent)
     int i = 0, end = 0, pi = -1, ref, level;
     QCString id, link, title;
     int blockIndent = indent;
+    int cachedIndentOffset = 0;
 
     // get indent for the first line
     end = i + 1;
@@ -2458,7 +2512,7 @@ static QCString processBlocks(const QCString &s, int indent)
                 pi = -1;
                 end = i + 1;
             }
-            else if (isFencedCodeBlock(data + pi, size - pi, indent, lang, blockStart, blockEnd, blockOffset, blockIndent))
+            else if (isFencedCodeBlock(data + pi, size - pi, indent, cachedIndentOffset, lang, blockStart, blockEnd, blockOffset, blockIndent))
             {
                 //printf("Found FencedCodeBlock lang='%s' start=%d end=%d code={%s}\n",
                 //       lang.data(),blockStart,blockEnd,QCString(data+pi+blockStart).left(blockEnd-blockStart).data());
