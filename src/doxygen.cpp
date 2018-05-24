@@ -10503,6 +10503,12 @@ void readConfiguration(int argc, char **argv)
     Config_getString(OUTPUT_DIRECTORY) = outputDirectory;
   }
 
+  Config_getString(SEARCHENGINE) = TRUE;
+
+  Config_getString(SERVER_BASED_SEARCH) = TRUE;
+
+  Config_getString(EXTERNAL_SEARCH) = TRUE;
+
   if (updateConfig)
   {
     generateConfigFile(configName,shortList,TRUE);
@@ -10536,6 +10542,12 @@ void checkConfiguration()
   {
     Config_getString(OUTPUT_DIRECTORY) = outputDirectory;
   }
+
+  Config_getString(SEARCHENGINE) = TRUE;
+
+  Config_getString(SERVER_BASED_SEARCH) = TRUE;
+
+  Config_getString(EXTERNAL_SEARCH) = TRUE;
 
   initWarningFormat();
 }
