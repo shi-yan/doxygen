@@ -10509,6 +10509,8 @@ void readConfiguration(int argc, char **argv)
 
   Config_getString(EXTERNAL_SEARCH) = TRUE;
 
+  Config_getBool(USE_MATHJAX) = TRUE;
+
   if (updateConfig)
   {
     generateConfigFile(configName,shortList,TRUE);
@@ -10548,6 +10550,8 @@ void checkConfiguration()
   Config_getString(SERVER_BASED_SEARCH) = TRUE;
 
   Config_getString(EXTERNAL_SEARCH) = TRUE;
+
+  Config_getBool(USE_MATHJAX) = TRUE;
 
   initWarningFormat();
 }
