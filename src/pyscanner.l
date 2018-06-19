@@ -1652,8 +1652,10 @@ static void parseMain(const char *fileName,const char *fileBuf,Entry *rt)
   {
     yyLineNr= 1 ; 
     yyFileName = fileName;
+    QCString fnshort = yyFileName;
+    removeTempPath(fnshort);
     //setContext();
-    msg("Parsing file %s...\n",yyFileName.data());
+    msg("Parsing file %s...\n",fnshort.data());
 
     QFileInfo fi(fileName);
     g_moduleScope = findPackageScope(fileName);

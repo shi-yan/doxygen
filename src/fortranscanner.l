@@ -2556,7 +2556,9 @@ static void parseMain(const char *fileName,const char *fileBuf,Entry *rt, Fortra
 
     yyLineNr= 1 ; 
     yyFileName = fileName;
-    msg("Parsing file %s...\n",yyFileName.data());
+    QCString shortfn = yyFileName;
+    removeTempPath(shortfn);
+    msg("Parsing file %s...\n",shortfn.data());
 
     startScope(rt); // implies current_root = rt
     initParser();

@@ -2332,7 +2332,7 @@ static QCString processQuotations(const QCString &s, int refIndent)
     {
         findEndOfLine(out, data, size, pi, i, end);
         // line is now found at [i..end)
-        printf("quote out={%s}\n",QCString(data+pi).left(i-pi).data());
+        //printf("quote out={%s}\n",QCString(data+pi).left(i-pi).data());
 
         if (pi != -1)
         {
@@ -2717,17 +2717,17 @@ QCString processMarkdown(const QCString &fileName, const int lineNr, Entry *e, c
     int refIndent;
     // for replace tabs by spaces
     QCString s = detab(input, refIndent);
-    printf("======== DeTab =========\n---- output -----\n%s\n---------\n", s.data());
+    //printf("======== DeTab =========\n---- output -----\n%s\n---------\n", s.data());
     // then process quotation blocks (as these may contain other blocks)
     s = processQuotations(s, refIndent);
-    printf("======== Quotations =========\n---- output -----\n%s\n---------\n", s.data());
+    //printf("======== Quotations =========\n---- output -----\n%s\n---------\n", s.data());
     // then process block items (headers, rules, and code blocks, references)
     s = processBlocks(s, refIndent);
-    printf("======== Blocks =========\n---- output -----\n%s\n---------\n", s.data());
+    //printf("======== Blocks =========\n---- output -----\n%s\n---------\n", s.data());
     // finally process the inline markup (links, emphasis and code spans)
     processInline(out, s, s.length());
     out.addChar(0);
-    Debug::print(Debug::Markdown, 0, "======== Markdown =========\n---- input ------- \n%s\n---- output -----\n%s\n---------\n", qPrint(input), qPrint(out.get()));
+    //Debug::print(Debug::Markdown, 0, "======== Markdown =========\n---- input ------- \n%s\n---- output -----\n%s\n---------\n", qPrint(input), qPrint(out.get()));
     return out.get();
 }
 

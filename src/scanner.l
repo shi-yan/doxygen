@@ -6951,7 +6951,9 @@ static void parseMain(const char *fileName,
       }
     }
     rt->lang = language;
-    msg("Parsing file %s...\n",yyFileName.data());
+    QCString fnshort = yyFileName;
+    removeTempPath(fnshort);
+    msg("Parsing file %s...\n",fnshort.data());
 
     current_root  = rt ;
     initParser();

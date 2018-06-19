@@ -1257,7 +1257,11 @@ static void generateXMLForClass(ClassDef *cd,FTextStream &ti)
   if (cd->templateMaster()!=0)  return; // skip generated template instances.
   if (cd->isArtificial())       return; // skip artificially created classes
 
-  msg("Generating XML output for class %s\n",cd->name().data());
+  QCString cdname = cd->name();
+
+  removeTempPath(cdname);
+
+  msg("Generating XML output for class %s\n",cdname.data());
 
   ti << "  <compound refid=\"" << classOutputFileBase(cd) 
      << "\" kind=\"" << cd->compoundTypeString()
@@ -1268,6 +1272,7 @@ static void generateXMLForClass(ClassDef *cd,FTextStream &ti)
   QFile f(fileName);
   if (!f.open(IO_WriteOnly))
   {
+    removeTempPath(fileName);
     err("Cannot open file %s for writing!\n",fileName.data());
     return;
   }
@@ -1952,6 +1957,8 @@ void generateXML()
   NamespaceDef *nd;
   for (nli.toFirst();(nd=nli.current());++nli)
   {
+    //QCString ndstr = nd->name();
+    //removeTempPath(ndstr);
     msg("Generating XML output for namespace %s\n",nd->name().data());
     generateXMLForNamespace(nd,t);
   }
@@ -1963,6 +1970,8 @@ void generateXML()
     FileDef *fd;
     for (;(fd=fni.current());++fni)
     {
+      QCString fdstr = fd->name();
+      removeTempPath(fdstr);
       msg("Generating XML output for file %s\n",fd->name().data());
       generateXMLForFile(fd,t);
     }
@@ -1988,7 +1997,9 @@ void generateXML()
     DirSDict::Iterator sdi(*Doxygen::directories);
     for (sdi.toFirst();(dir=sdi.current());++sdi)
     {
-      msg("Generate XML output for dir %s\n",dir->name().data());
+      QCString dirstr = dir->name();
+      removeTempPath(dirstr);
+      msg("Generate XML output for dir %s\n",dirstr.data());
       generateXMLForDir(dir,t);
     }
   }

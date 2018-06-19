@@ -117,7 +117,8 @@ class LetterToIndexMap : public SIntDict<T>
 
 QCString langToString(SrcLangExt lang);
 QCString getLanguageSpecificSeparator(SrcLangExt lang,bool classScope=FALSE);
-
+void removeTempPath(QCString &file);
+void enableFilepathCleanup(const char *prefix);
 //--------------------------------------------------------------------
 
 void linkifyText(const TextGeneratorIntf &ol,

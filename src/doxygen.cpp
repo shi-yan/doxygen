@@ -5580,10 +5580,12 @@ static bool findGlobalMember(EntryNav *rootNav,
         warnMsg+="\nPossible candidates:\n";
         for (mni.toFirst();(md=mni.current());++mni)
         {
+          QCString filenameStr = md->getDefFileName();
+          removeTempPath(filenameStr);
           warnMsg+=" '";
           warnMsg+=substitute(md->declaration(),"%","%%");
           warnMsg+="' at line "+QCString().setNum(md->getDefLine())+
-                   " of file"+md->getDefFileName()+"\n";
+                   " of file"+filenameStr+"\n";
         }
       }
       warn(root->fileName,root->startLine,warnMsg);
@@ -7854,16 +7856,17 @@ static void generateFileSources()
             QStrList filesInSameTu;
             fd->getAllIncludeFilesRecursively(filesInSameTu);
             fd->startParsing();
+            QCString filename = fd->docName();
+            removeTempPath(filename);
             if (fd->generateSourceFile() && !g_useOutputTemplate) // sources need to be shown in the output
             {
-              msg("Generating code for file %s...\n",fd->docName().data());
+              msg("Generating code for file %s...\n",filename.data());
               fd->writeSource(*g_outputList,FALSE,filesInSameTu);
-
             }
             else if (!fd->isReference() && Doxygen::parseSourcesNeeded)
               // we needed to parse the sources even if we do not show them
             {
-              msg("Parsing code for file %s...\n",fd->docName().data());
+              msg("Parsing code for file %s...\n",filename.data());
               fd->parseSource(FALSE,filesInSameTu);
             }
 
@@ -7875,18 +7878,20 @@ static void generateFileSources()
                 QStrList moreFiles;
                 bool ambig;
                 FileDef *ifd=findFileDef(Doxygen::inputNameDict,incFile,ambig);
+                QCString ifilename = ifd->docName();
+                removeTempPath(ifilename);
                 if (ifd && !ifd->isReference())
                 {
                   if (ifd->generateSourceFile() && !g_useOutputTemplate) // sources need to be shown in the output
                   {
-                    msg(" Generating code for file %s...\n",ifd->docName().data());
+                    msg(" Generating code for file %s...\n",ifilename.data());
                     ifd->writeSource(*g_outputList,TRUE,moreFiles);
 
                   }
                   else if (!ifd->isReference() && Doxygen::parseSourcesNeeded)
                     // we needed to parse the sources even if we do not show them
                   {
-                    msg(" Parsing code for file %s...\n",ifd->docName().data());
+                    msg(" Parsing code for file %s...\n",ifilename.data());
                     ifd->parseSource(TRUE,moreFiles);
                   }
                   g_processedFiles.insert(incFile,(void*)0x8);
@@ -7910,16 +7915,18 @@ static void generateFileSources()
           {
             QStrList filesInSameTu;
             fd->startParsing();
+            QCString filename = fd->docName();
+            removeTempPath(filename);
             if (fd->generateSourceFile() && !g_useOutputTemplate) // sources need to be shown in the output
             {
-              msg("Generating code for file %s...\n",fd->docName().data());
+              msg("Generating code for file %s...\n",filename.data());
               fd->writeSource(*g_outputList,FALSE,filesInSameTu);
 
             }
             else if (!fd->isReference() && Doxygen::parseSourcesNeeded)
               // we needed to parse the sources even if we do not show them
             {
-              msg("Parsing code for file %s...\n",fd->docName().data());
+              msg("Parsing code for file %s...\n",filename.data());
               fd->parseSource(FALSE,filesInSameTu);
             }
             fd->finishParsing();
@@ -7940,16 +7947,18 @@ static void generateFileSources()
         {
           QStrList filesInSameTu;
           fd->startParsing();
+          QCString filename = fd->docName();
+          removeTempPath(filename);
           if (fd->generateSourceFile() && !g_useOutputTemplate) // sources need to be shown in the output
           {
-            msg("Generating code for file %s...\n",fd->docName().data());
+            msg("Generating code for file %s...\n",filename.data());
             fd->writeSource(*g_outputList,FALSE,filesInSameTu);
 
           }
           else if (!fd->isReference() && Doxygen::parseSourcesNeeded)
             // we needed to parse the sources even if we do not show them
           {
-            msg("Parsing code for file %s...\n",fd->docName().data());
+            msg("Parsing code for file %s...\n",filename.data());
             fd->parseSource(FALSE,filesInSameTu);
           }
           fd->finishParsing();
@@ -9352,13 +9361,17 @@ static void parseFile(ParserInterface *parser,
       parser->needsPreprocessing(extension))
   {
     BufStr inBuf(fi.size()+4096);
-    msg("Preprocessing %s...\n",fn);
+    QCString shortfn = fileName;
+    removeTempPath(shortfn);
+    msg("Preprocessing %s...\n",shortfn.data());
     readInputFile(fileName,inBuf);
     preprocessFile(fileName,inBuf,preBuf);
   }
   else // no preprocessing
   {
-    msg("Reading %s...\n",fn);
+    QCString shortfn = fn;
+    removeTempPath(shortfn);
+    msg("Reading %s...\n",shortfn.data());
     readInputFile(fileName,preBuf);
   }
   if (preBuf.data() && preBuf.curPos()>0 && *(preBuf.data()+preBuf.curPos()-1)!='\n')
@@ -9581,7 +9594,9 @@ int readDir(QFileInfo *fi,
   QDir dir(dirName);
   dir.setFilter( QDir::Files | QDir::Dirs | QDir::Hidden );
   int totalSize=0;
-  msg("Searching for files in directory %s\n", fi->absFilePath().data());
+  QCString absshortfn = fi->absFilePath().data();
+  removeTempPath(absshortfn);
+  msg("Searching for files in directory %s\n", absshortfn.data());
   //printf("killDict=%p count=%d\n",killDict,killDict->count());
 
   const QFileInfoList *list = dir.entryInfoList();
@@ -10177,6 +10192,7 @@ void readConfiguration(int argc, char **argv)
 
   bool overwriteOutputDirectory=FALSE;
   const char *outputDirectory=0;
+  const char *stringCleanUp=0;
 
   while (optind<argc && argv[optind][0]=='-' &&
                (isalpha(argv[optind][1]) || argv[optind][1]=='?' ||
@@ -10185,6 +10201,13 @@ void readConfiguration(int argc, char **argv)
   {
     switch(argv[optind][1])
     {
+      case 'c':
+        stringCleanUp=getArg(argc,argv,optind);
+        if (stringCleanUp)
+        {
+          enableFilepathCleanup(stringCleanUp);
+        }
+        break;
       case 'o':
         outputDirectory=getArg(argc,argv,optind);
         if (outputDirectory)

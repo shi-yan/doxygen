@@ -8851,6 +8851,20 @@ int usedTableLevels()
   return g_usedTableLevels;
 }
 
+static QCString filepathPrefix;
+void enableFilepathCleanup(const char *prefix)
+{
+  filepathPrefix = prefix;
+}
+
+void removeTempPath(QCString &file)
+{
+  if (file.find(filepathPrefix)>=0)
+  {
+    file.replace(filepathPrefix, "");
+  }
+}
+
 //------------------------------------------------------
 
 

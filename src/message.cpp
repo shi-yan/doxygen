@@ -122,6 +122,7 @@ void msg(const char *fmt, ...)
 static void format_warn(const char *file,int line,const char *text)
 {
   QCString fileSubst = file==0 ? "<unknown>" : file;
+  removeTempPath(fileSubst);
   QCString lineSubst; lineSubst.setNum(line);
   QCString textSubst = text;
   QCString versionSubst;
