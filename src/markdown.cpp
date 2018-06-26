@@ -750,12 +750,21 @@ static int processLink(GrowBuf &out, const char *data, int, int size)
             i++;
             titleStart = i;
             nl = 0;
-            while (i < size && data[i] != ')')
+            braceCount = 0;
+            while (i < size && !(data[i] == ')' && braceCount == 0))
             {
                 if (data[i] == '\n')
                 {
                     if (nl > 1) return 0;
                     nl++;
+                }
+                else if (data[i] == '(')
+                {
+                    braceCount ++;
+                }
+                else if (data[i] == ')')
+                {
+                    braceCount --;
                 }
                 i++;
             }
